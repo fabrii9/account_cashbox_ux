@@ -1,0 +1,58 @@
+from odoo import _, fields, models
+from odoo.exceptions import UserError
+
+
+class AccountCashboxSession(models.Model):
+    _inherit = "account.cashbox.session"
+
+    auto_transfer_payment_ids = fields.One2many(
+        "account.payment",
+        "cashbox_auto_transfer_session_id",
+        string="Transferencias Automáticas",
+        readonly=True,
+    )
+
+    def action_account_cashbox_session_close(self):
+        res = super().action_account_cashbox_session_close()
+        # Si super devuelve una accion (wizard de ajuste), no crear transferencias aún
+        if res:
+            return res
+        # Si la sesión se cerró (state == closed), crear transferencias automáticas
+        for session in self.filtered(lambda s: s.state == "closed"):
+            session._create_auto_transfers()
+        return res
+
+    def _create_auto_transfers(self):
+        self.ensure_one()
+        cashbox = self.cashbox_id
+        if not cashbox.auto_transfer_journal_ids or not cashbox.auto_transfer_destination_journal_id:
+            return
+
+        dest_journal = cashbox.auto_transfer_destination_journal_id
+        for source_journal in cashbox.auto_transfer_journal_ids:
+            # Calcular el monto de la sesión para este diario
+            line = self.line_ids.filtered(lambda l: l.journal_id == source_journal)
+            if not line:
+                continue
+            amount = line.balance_end
+            if amount <= 0:
+                continue
+
+            # Crear el pago de transferencia (lado salida - se postea)
+            payment_vals = {
+                "payment_type": "outbound",
+                "is_internal_transfer": True,
+                "journal_id": source_journal.id,
+                "destination_journal_id": dest_journal.id,
+                "amount": amount,
+                "date": fields.Date.context_today(self),
+                "memo": _("Cierre sesión %s", self.name),
+                "cashbox_session_id": self.id,
+                "cashbox_auto_transfer_session_id": self.id,
+            }
+            payment = self.env["account.payment"].sudo().create(payment_vals)
+            # Postear el lado salida (esto normalmente crea y postea el paired payment)
+            # Usamos contexto para que el paired se quede en draft
+            payment.with_context(
+                auto_transfer_keep_paired_draft=True,
+            ).action_post()

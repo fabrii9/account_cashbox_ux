@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="account_cashbox_view_form_inherit_ux" model="ir.ui.view">
+        <field name="name">account.cashbox.form.inherit.ux</field>
+        <field name="model">account.cashbox</field>
+        <field name="inherit_id" ref="account_cashbox.account_cashbox_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//group[last()]" position="after">
+                <separator string="Transferencia Automática al Cierre"/>
+                <group>
+                    <group>
+                        <field name="auto_transfer_journal_ids" widget="many2many_tags"
+                            domain="[('id', 'in', journal_ids)]"/>
+                    </group>
+                    <group>
+                        <field name="auto_transfer_destination_journal_id"
+                            required="auto_transfer_journal_ids"/>
+                    </group>
+                </group>
+            </xpath>
+        </field>
+    </record>
+</odoo>

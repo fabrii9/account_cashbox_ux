@@ -1,0 +1,331 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="report_cashbox_session">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="session">
+                <t t-call="web.external_layout">
+                    <div class="page" style="font-size: 12px;">
+
+                        <!-- ==================== ENCABEZADO ==================== -->
+                        <div class="text-center mb-3">
+                            <h2><strong>Reporte de Sesión de Caja</strong></h2>
+                        </div>
+
+                        <table style="width: 100%; margin-bottom: 20px;">
+                            <tr>
+                                <td style="width: 50%; vertical-align: top;">
+                                    <table style="width: 100%;">
+                                        <tr>
+                                            <td style="width: 45%; font-weight: bold; padding: 3px 0;">Caja:</td>
+                                            <td style="padding: 3px 0;"><t t-out="session.cashbox_id.name"/></td>
+                                        </tr>
+                                        <tr>
+                                            <td style="font-weight: bold; padding: 3px 0;">Sesión Nº:</td>
+                                            <td style="padding: 3px 0;"><t t-out="session.name"/></td>
+                                        </tr>
+                                        <tr>
+                                            <td style="font-weight: bold; padding: 3px 0;">Empresa:</td>
+                                            <td style="padding: 3px 0;"><t t-out="session.company_id.name"/></td>
+                                        </tr>
+                                        <tr>
+                                            <td style="font-weight: bold; padding: 3px 0;">Estado:</td>
+                                            <td style="padding: 3px 0;">
+                                                <t t-if="session.state == 'draft'">Borrador</t>
+                                                <t t-if="session.state == 'opened'">Abierta</t>
+                                                <t t-if="session.state == 'closing_control'">Control de cierre</t>
+                                                <t t-if="session.state == 'closed'">Cerrada</t>
+                                            </td>
+                                        </tr>
+                                    </table>
+                                </td>
+                                <td style="width: 50%; vertical-align: top;">
+                                    <table style="width: 100%;">
+                                        <tr>
+                                            <td style="width: 45%; font-weight: bold; padding: 3px 0;">Usuario(s):</td>
+                                            <td style="padding: 3px 0;">
+                                                <t t-foreach="session.user_ids" t-as="user">
+                                                    <t t-out="user.name"/><t t-if="not user_last">, </t>
+                                                </t>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td style="font-weight: bold; padding: 3px 0;">Apertura:</td>
+                                            <td style="padding: 3px 0;">
+                                                <t t-if="session.opening_date">
+                                                    <t t-out="session.opening_date" t-options="{'widget': 'datetime'}"/>
+                                                </t>
+                                                <t t-else="">-</t>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td style="font-weight: bold; padding: 3px 0;">Cierre:</td>
+                                            <td style="padding: 3px 0;">
+                                                <t t-if="session.closing_date">
+                                                    <t t-out="session.closing_date" t-options="{'widget': 'datetime'}"/>
+                                                </t>
+                                                <t t-else="">-</t>
+                                            </td>
+                                        </tr>
+                                    </table>
+                                </td>
+                            </tr>
+                        </table>
+
+                        <!-- ==================== RESUMEN POR DIARIO ==================== -->
+                        <h4 class="mt-3 mb-2"><strong>Resumen por Diario</strong></h4>
+                        <table class="table table-sm table-bordered" style="font-size: 11px;">
+                            <thead>
+                                <tr style="background-color: #e9ecef;">
+                                    <th>Diario</th>
+                                    <th>Moneda</th>
+                                    <th class="text-end">Balance Inicial</th>
+                                    <th class="text-end">Cobros</th>
+                                    <th class="text-end">Pagos</th>
+                                    <th class="text-end">Transferencias</th>
+                                    <th class="text-end">Movimiento Neto</th>
+                                    <th class="text-end">Balance Final</th>
+                                    <th t-if="session.require_cash_control" class="text-end">Balance Real</th>
+                                    <th t-if="session.require_cash_control" class="text-end">Diferencia</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <t t-foreach="session.line_ids" t-as="line">
+                                    <t t-set="line_payments" t-value="session.payment_ids.filtered(lambda p: p.journal_id == line.journal_id and p.state not in ('draft', 'canceled'))"/>
+                                    <t t-set="inbound_total" t-value="sum(line_payments.filtered(lambda p: p.payment_type == 'inbound').mapped('amount_signed'))"/>
+                                    <t t-set="outbound_total" t-value="sum(line_payments.filtered(lambda p: p.payment_type == 'outbound').mapped('amount_signed'))"/>
+                                    <t t-set="transfer_total" t-value="sum(line_payments.filtered(lambda p: p.payment_type not in ('inbound', 'outbound')).mapped('amount_signed'))"/>
+                                    <tr>
+                                        <td><t t-out="line.journal_id.name"/></td>
+                                        <td><t t-out="line.currency_id.name"/></td>
+                                        <td class="text-end">
+                                            <t t-out="line.balance_start" t-options="{'widget': 'monetary', 'display_currency': line.currency_id}"/>
+                                        </td>
+                                        <td class="text-end">
+                                            <t t-out="inbound_total" t-options="{'widget': 'monetary', 'display_currency': line.currency_id}"/>
+                                        </td>
+                                        <td class="text-end">
+                                            <t t-out="outbound_total" t-options="{'widget': 'monetary', 'display_currency': line.currency_id}"/>
+                                        </td>
+                                        <td class="text-end">
+                                            <t t-out="transfer_total" t-options="{'widget': 'monetary', 'display_currency': line.currency_id}"/>
+                                        </td>
+                                        <td class="text-end">
+                                            <t t-out="line.amount" t-options="{'widget': 'monetary', 'display_currency': line.currency_id}"/>
+                                        </td>
+                                        <td class="text-end">
+                                            <t t-out="line.balance_end" t-options="{'widget': 'monetary', 'display_currency': line.currency_id}"/>
+                                        </td>
+                                        <td t-if="session.require_cash_control" class="text-end">
+                                            <t t-if="line.require_cash_control and line.balance_end_real != 0.0001">
+                                                <t t-out="line.balance_end_real" t-options="{'widget': 'monetary', 'display_currency': line.currency_id}"/>
+                                            </t>
+                                            <t t-else="">-</t>
+                                        </td>
+                                        <td t-if="session.require_cash_control" class="text-end">
+                                            <t t-if="line.require_cash_control and line.balance_end_real != 0.0001">
+                                                <span t-attf-style="color: #{abs(line.balance_difference) > 0.01 and 'red' or 'inherit'};">
+                                                    <t t-out="line.balance_difference" t-options="{'widget': 'monetary', 'display_currency': line.currency_id}"/>
+                                                </span>
+                                            </t>
+                                            <t t-else="">-</t>
+                                        </td>
+                                    </tr>
+                                </t>
+                            </tbody>
+                        </table>
+
+                        <!-- Variables para las secciones de detalle -->
+                        <t t-set="posted_payments" t-value="session.payment_ids.filtered(lambda p: p.state not in ('draft', 'canceled'))"/>
+                        <t t-set="inbound_payments" t-value="posted_payments.filtered(lambda p: p.payment_type == 'inbound')"/>
+                        <t t-set="outbound_payments" t-value="posted_payments.filtered(lambda p: p.payment_type == 'outbound')"/>
+                        <t t-set="transfer_payments" t-value="posted_payments.filtered(lambda p: p.payment_type not in ('inbound', 'outbound'))"/>
+
+                        <!-- ==================== COBROS (INBOUND) ==================== -->
+                        <t t-if="inbound_payments">
+                            <h4 class="mt-4 mb-2"><strong>Cobros</strong></h4>
+                            <table class="table table-sm table-bordered" style="font-size: 11px;">
+                                <thead>
+                                    <tr style="background-color: #d4edda;">
+                                        <th>Fecha</th>
+                                        <th>Número</th>
+                                        <th>Cliente</th>
+                                        <th>Referencia</th>
+                                        <th>Diario</th>
+                                        <th class="text-end">Monto</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <t t-foreach="inbound_payments" t-as="pay">
+                                        <tr>
+                                            <td><t t-out="pay.date" t-options="{'widget': 'date'}"/></td>
+                                            <td><t t-out="pay.name"/></td>
+                                            <td><t t-out="pay.partner_id.name or '-'"/></td>
+                                            <td><t t-out="pay.memo or '-'"/></td>
+                                            <td><t t-out="pay.journal_id.name"/></td>
+                                            <td class="text-end">
+                                                <t t-out="pay.amount" t-options="{'widget': 'monetary', 'display_currency': pay.currency_id}"/>
+                                            </td>
+                                        </tr>
+                                    </t>
+                                </tbody>
+                                <tfoot>
+                                    <tr style="font-weight: bold; background-color: #d4edda;">
+                                        <td colspan="5" class="text-end">Total Cobros:</td>
+                                        <td class="text-end">
+                                            <t t-out="sum(inbound_payments.mapped('amount'))" t-options="{'widget': 'monetary', 'display_currency': session.company_id.currency_id}"/>
+                                        </td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </t>
+
+                        <!-- ==================== PAGOS (OUTBOUND) ==================== -->
+                        <t t-if="outbound_payments">
+                            <h4 class="mt-4 mb-2"><strong>Pagos</strong></h4>
+                            <table class="table table-sm table-bordered" style="font-size: 11px;">
+                                <thead>
+                                    <tr style="background-color: #f8d7da;">
+                                        <th>Fecha</th>
+                                        <th>Número</th>
+                                        <th>Proveedor</th>
+                                        <th>Referencia</th>
+                                        <th>Diario</th>
+                                        <th class="text-end">Monto</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <t t-foreach="outbound_payments" t-as="pay">
+                                        <tr>
+                                            <td><t t-out="pay.date" t-options="{'widget': 'date'}"/></td>
+                                            <td><t t-out="pay.name"/></td>
+                                            <td><t t-out="pay.partner_id.name or '-'"/></td>
+                                            <td><t t-out="pay.memo or '-'"/></td>
+                                            <td><t t-out="pay.journal_id.name"/></td>
+                                            <td class="text-end">
+                                                <t t-out="pay.amount" t-options="{'widget': 'monetary', 'display_currency': pay.currency_id}"/>
+                                            </td>
+                                        </tr>
+                                    </t>
+                                </tbody>
+                                <tfoot>
+                                    <tr style="font-weight: bold; background-color: #f8d7da;">
+                                        <td colspan="5" class="text-end">Total Pagos:</td>
+                                        <td class="text-end">
+                                            <t t-out="sum(outbound_payments.mapped('amount'))" t-options="{'widget': 'monetary', 'display_currency': session.company_id.currency_id}"/>
+                                        </td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </t>
+
+                        <!-- ==================== TRANSFERENCIAS INTERNAS ==================== -->
+                        <t t-if="transfer_payments">
+                            <h4 class="mt-4 mb-2"><strong>Transferencias Internas</strong></h4>
+                            <table class="table table-sm table-bordered" style="font-size: 11px;">
+                                <thead>
+                                    <tr style="background-color: #cce5ff;">
+                                        <th>Fecha</th>
+                                        <th>Número</th>
+                                        <th>Diario Origen</th>
+                                        <th>Diario Destino</th>
+                                        <th>Sesión Destino</th>
+                                        <th class="text-end">Monto</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <t t-foreach="transfer_payments" t-as="pay">
+                                        <tr>
+                                            <td><t t-out="pay.date" t-options="{'widget': 'date'}"/></td>
+                                            <td><t t-out="pay.name"/></td>
+                                            <td><t t-out="pay.journal_id.name"/></td>
+                                            <td><t t-out="pay.destination_journal_id.name or '-'"/></td>
+                                            <td><t t-out="pay.destination_cashbox_session_id.name or '-'"/></td>
+                                            <td class="text-end">
+                                                <t t-out="pay.amount" t-options="{'widget': 'monetary', 'display_currency': pay.currency_id}"/>
+                                            </td>
+                                        </tr>
+                                    </t>
+                                </tbody>
+                                <tfoot>
+                                    <tr style="font-weight: bold; background-color: #cce5ff;">
+                                        <td colspan="5" class="text-end">Total Transferencias:</td>
+                                        <td class="text-end">
+                                            <t t-out="sum(transfer_payments.mapped('amount'))" t-options="{'widget': 'monetary', 'display_currency': session.company_id.currency_id}"/>
+                                        </td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </t>
+
+                        <!-- ==================== TOTALES GENERALES ==================== -->
+                        <h4 class="mt-4 mb-2"><strong>Totales Generales</strong></h4>
+                        <table class="table table-sm table-bordered" style="font-size: 12px; width: 50%; margin-left: auto;">
+                            <tbody>
+                                <tr>
+                                    <td style="font-weight: bold;">Total Cobros</td>
+                                    <td class="text-end" style="color: green;">
+                                        <t t-out="sum(inbound_payments.mapped('amount'))" t-options="{'widget': 'monetary', 'display_currency': session.company_id.currency_id}"/>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="font-weight: bold;">Total Pagos</td>
+                                    <td class="text-end" style="color: red;">
+                                        <t t-out="sum(outbound_payments.mapped('amount'))" t-options="{'widget': 'monetary', 'display_currency': session.company_id.currency_id}"/>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="font-weight: bold;">Total Transferencias</td>
+                                    <td class="text-end" style="color: blue;">
+                                        <t t-out="sum(transfer_payments.mapped('amount'))" t-options="{'widget': 'monetary', 'display_currency': session.company_id.currency_id}"/>
+                                    </td>
+                                </tr>
+                                <tr style="border-top: 2px solid #333;">
+                                    <td style="font-weight: bold; font-size: 13px;">Neto de la Sesión</td>
+                                    <td class="text-end" style="font-weight: bold; font-size: 13px;">
+                                        <t t-out="sum(posted_payments.mapped('amount_signed'))" t-options="{'widget': 'monetary', 'display_currency': session.company_id.currency_id}"/>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <!-- ==================== ASIENTOS DE AJUSTE ==================== -->
+                        <t t-set="adjustment_moves" t-value="session.env['account.move'].search([('cashbox_session_id', '=', session.id)])"/>
+                        <t t-if="adjustment_moves">
+                            <h4 class="mt-4 mb-2"><strong>Asientos de Ajuste</strong></h4>
+                            <table class="table table-sm table-bordered" style="font-size: 11px;">
+                                <thead>
+                                    <tr style="background-color: #fff3cd;">
+                                        <th>Fecha</th>
+                                        <th>Número</th>
+                                        <th>Diario</th>
+                                        <th>Referencia</th>
+                                        <th class="text-end">Monto Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <t t-foreach="adjustment_moves" t-as="move">
+                                        <tr>
+                                            <td><t t-out="move.date" t-options="{'widget': 'date'}"/></td>
+                                            <td><t t-out="move.name"/></td>
+                                            <td><t t-out="move.journal_id.name"/></td>
+                                            <td><t t-out="move.ref or '-'"/></td>
+                                            <td class="text-end">
+                                                <t t-out="move.amount_total_signed" t-options="{'widget': 'monetary', 'display_currency': session.company_id.currency_id}"/>
+                                            </td>
+                                        </tr>
+                                    </t>
+                                </tbody>
+                            </table>
+                        </t>
+
+                        <!-- ==================== PIE ==================== -->
+                        <div class="mt-4 text-end" style="font-size: 10px; color: #888;">
+                            <p>Reporte generado el <t t-out="datetime.datetime.now()" t-options="{'widget': 'datetime'}"/></p>
+                        </div>
+
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+</odoo>
