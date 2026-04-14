@@ -1,4 +1,4 @@
-from odoo import _, fields, models
+from odoo import Command, _, api, fields, models
 from odoo.exceptions import UserError
 
 
@@ -11,6 +11,17 @@ class AccountCashboxSession(models.Model):
         string="Transferencias Automáticas",
         readonly=True,
     )
+
+    @api.depends("cashbox_id")
+    def _compute_line_ids(self):
+        super()._compute_line_ids()
+        for rec in self:
+            auto_journal_ids = rec.cashbox_id.auto_transfer_journal_ids
+            if not auto_journal_ids:
+                continue
+            for line in rec.line_ids:
+                if line.journal_id in auto_journal_ids:
+                    line.balance_start = 0.0
 
     def action_account_cashbox_session_close(self):
         res = super().action_account_cashbox_session_close()
