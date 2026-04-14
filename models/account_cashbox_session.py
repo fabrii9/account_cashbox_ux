@@ -39,6 +39,8 @@ class AccountCashboxSession(models.Model):
                 continue
 
             # Crear el pago de transferencia (lado salida - se postea)
+            # No asignamos cashbox_session_id para evitar la validación de sesión abierta
+            # La trazabilidad se mantiene con cashbox_auto_transfer_session_id
             payment_vals = {
                 "payment_type": "outbound",
                 "is_internal_transfer": True,
@@ -47,7 +49,6 @@ class AccountCashboxSession(models.Model):
                 "amount": amount,
                 "date": fields.Date.context_today(self),
                 "memo": _("Cierre sesión %s", self.name),
-                "cashbox_session_id": self.id,
                 "cashbox_auto_transfer_session_id": self.id,
             }
             payment = self.env["account.payment"].sudo().create(payment_vals)
